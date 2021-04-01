@@ -105,6 +105,8 @@ import UIKit
     private var collapsedLinkTextRange: NSRange?
     private var expandedLinkTextRange: NSRange?
 
+    private var didHandledTouches: Bool = true
+    
     open override var numberOfLines: NSInteger {
         didSet {
             collapsedNumberOfLines = numberOfLines
@@ -175,14 +177,26 @@ import UIKit
 extension ExpandableLabel {
 
     open override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        setLinkHighlighted(touches, event: event, highlighted: true)
+        didHandledTouches = setLinkHighlighted(touches, event: event, highlighted: true)
+        if !didHandledTouches {
+            next?.touchesBegan(touches, with: event)
+        }
     }
 
     open override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        setLinkHighlighted(touches, event: event, highlighted: false)
+        didHandledTouches = setLinkHighlighted(touches, event: event, highlighted: false)
+        if !didHandledTouches {
+            next?.touchesCancelled(touches, with: event)
+        }
+
     }
 
     open override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if !didHandledTouches {
+            next?.touchesEnded(touches, with: event)
+            return
+        }
+
         guard let touch = touches.first else {
             return
         }
@@ -373,11 +387,11 @@ extension ExpandableLabel {
             return false
         }
 
-        guard let range = self.collapsedLinkTextRange else {
-            return false
-        }
-
-        if collapsed && check(touch: touch, isInRange: range) {
+        if collapsed, let range = collapsedLinkTextRange, check(touch: touch, isInRange: range) {
+            linkHighlighted = highlighted
+            setNeedsDisplay()
+            return true
+        } else if !collapsed, let range = expandedLinkTextRange, check(touch: touch, isInRange: range) {
             linkHighlighted = highlighted
             setNeedsDisplay()
             return true
